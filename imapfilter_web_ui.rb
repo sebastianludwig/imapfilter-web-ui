@@ -30,9 +30,9 @@ class ImapfilterWebUI < Sinatra::Application
   def sse_message(action, log_entry)
     @running = @@imapfilter&.running?
 
+    # some strings are ASCII-8BIT encoded (or are marked as such) and thus can't be JSON encoded.
+    # Enforcing UTF-8 encoding fixes that.
     log_entry[:text] = log_entry[:text].force_encoding("utf-8")
-    puts log_entry.inspect
-    puts log_entry[:text].encoding
     html = erb :log_entry, layout: false, locals: { entry: log_entry }
     data = {
       html: html,
@@ -40,7 +40,7 @@ class ImapfilterWebUI < Sinatra::Application
     }
     message = "id: #{log_entry[:id]}\n"
     message << "event: #{action.to_s}\n"
-    message << "data: #{Base64.strict_encode64(JSON.generate(data))}\n"
+    message << "data: #{ERB::Util.url_encode(JSON.generate(data))}\n"
     message << "\n"
     message
   end

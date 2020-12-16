@@ -5,8 +5,7 @@ var loginRedirectIfNecessary = function(entry) {
 };
 
 var extractEntry = function(event) {
-  var json = atob(event.data);
-  return JSON.parse(json);
+  return JSON.parse(decodeURIComponent(event.data));
 };
 
 var addLogEntry = function(event) {

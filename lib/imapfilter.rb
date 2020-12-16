@@ -16,20 +16,16 @@ class Imapfilter
 
     @input_buffer_queue = []
     @input_buffer_queue_mutex = Mutex.new
-
-    @log_update_handlers = []
-    @log_update_handlers_mutex = Mutex.new
   end
 
-  def on_log_update(&block)
+  # Called with:
+  #  - `:add, log_entry_hash` when a new log entry has been added
+  #  - `:replace, log_entry_hash` when a log entry has been replaced
+  #  - `:exit, status` when the process has exited
+  def on_update(&block)
+    @on_update = block
     @out.on_update(&block)
     @err.on_update(&block)
-  end
-
-  def remove_log_update_handler(proc)
-    @log_update_handlers_mutex.synchronize do
-      @log_update_handlers.delete proc
-    end
   end
 
   def running?
@@ -110,6 +106,7 @@ class Imapfilter
           readable = ready_streams[0]
           writable = ready_streams[1]
 
+          # write to stdin
           if writable.include? stdin
             begin
               # extract a chunk of input data (like bacon but input data)
@@ -135,6 +132,7 @@ class Imapfilter
             end
           end
 
+          # read from stdout and stderr
           readable.each do |stream|
             begin
               stream_to_log[stream] << stream.read_nonblock(4096)
@@ -145,6 +143,8 @@ class Imapfilter
         end
 
         wait_thr.join
+
+        @on_update&.call(:exit, wait_thr.value.exitstatus)
 
         @pid_mutex.synchronize do
           @alive_mutex.synchronize { @alive = false }
@@ -166,6 +166,7 @@ class Imapfilter
     @pid_mutex.synchronize do
       return if @pid.nil?
       Process.kill("SIGINT", @pid)
+      # block until the process has exited
       @pid_signal.wait(@pid_mutex) unless @pid.nil?
     end
   end

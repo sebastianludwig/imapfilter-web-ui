@@ -31,11 +31,17 @@ var replaceLogEntry = function(event) {
   loginRedirectIfNecessary(entry);
 };
 
+var onProcessExit = function(event) {
+  document.getElementById("running-indicator-inactive").classList.remove("d-none");
+  document.getElementById("running-indicator-active").classList.add("d-none");
+};
+
 var onDocumentReady = function() {
   // register server side event (SSE) listeners
   var src = new EventSource("/log");
   src.addEventListener("add", addLogEntry);
   src.addEventListener("replace", replaceLogEntry);
+  src.addEventListener("exit", onProcessExit);
 };
 
 if (document.readyState !== "loading") {

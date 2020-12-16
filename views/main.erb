@@ -2,7 +2,8 @@
   <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
     <div class="container-fluid">
       <a class="navbar-brand" href="/">Imapfilter</a>
-      <span class="navbar-text flex-fill"><%= @running ? "🟢" : "🔴" %></span>
+      <span id="running-indicator-active" class="navbar-text flex-fill <%= @running ? "" : "d-none" %>">🟢</span>
+      <span id="running-indicator-inactive" class="navbar-text flex-fill <%= @running ? "d-none" : "" %>">🔴</span>
 
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
         <span class="navbar-toggler-icon"></span>
@@ -50,5 +51,5 @@
   </nav>
 
   <script src="/js/bootstrap.bundle.min.js"></script>
-  <script src="/js/imapfilter.js"></script>
+  <script src="/js/imapfilter.js?cache<%= rand(1000) %>"></script>
 </body>

@@ -27,7 +27,15 @@ class ImapfilterWebUI < Sinatra::Application
     !log_entry[:complete] and log_entry[:text].start_with?("Enter password")
   end
 
-  def sse_message(action, log_entry)
+  def sse_message(id:, event:, data:)
+    message = "id: #{id}\n"
+    message << "event: #{event}\n"
+    message << "data: #{data}\n"
+    message << "\n"
+    message
+  end
+
+  def sse_log_entry_message(action, log_entry)
     @running = @@imapfilter&.running?
 
     # some strings are ASCII-8BIT encoded (or are marked as such) and thus can't be JSON encoded.
@@ -38,17 +46,19 @@ class ImapfilterWebUI < Sinatra::Application
       html: html,
       needs_login: @running && needs_login?(log_entry)
     }
-    message = "id: #{log_entry[:id]}\n"
-    message << "event: #{action.to_s}\n"
-    message << "data: #{ERB::Util.url_encode(JSON.generate(data))}\n"
-    message << "\n"
-    message
+    sse_message(id: log_entry[:id], event: action, data: ERB::Util.url_encode(JSON.generate(data)))
   end
 
   def broadcast_sse_log_entry(action, entry)
     @@connections.reject!(&:closed?)
     
-    @@connections.each { |out| out << sse_message(action, entry) }
+    @@connections.each do |out|
+      if action == :exit
+        out << sse_message(id: nil, event: action, data: entry)
+      else
+        out << sse_log_entry_message(action, entry)
+      end
+    end
   end
 
   def show_main_page
@@ -58,7 +68,7 @@ class ImapfilterWebUI < Sinatra::Application
     if @running and @log.any? { |e| needs_login? e }
       redirect "/login"
     else
-      erb :index
+      erb :main
     end
   end
 
@@ -70,10 +80,10 @@ class ImapfilterWebUI < Sinatra::Application
     entry = log_entries.reverse.find { |e| needs_login? e }
     if entry
       @account = entry[:text].match(/Enter password for (.+?)@/).captures.first
+      erb :login
     else
-      @account = ""
+      redirect "/"
     end
-    erb :login
   end
 
   post "/login" do
@@ -85,7 +95,7 @@ class ImapfilterWebUI < Sinatra::Application
     @@imapfilter_mutex.synchronize do
       return if @@imapfilter&.alive?
       @@imapfilter = Imapfilter.new
-      @@imapfilter.on_log_update { |action, entry| broadcast_sse_log_entry(action, entry) }
+      @@imapfilter.on_update { |action, entry| broadcast_sse_log_entry(action, entry) }
       @@imapfilter.start
     end
     show_main_page
@@ -114,7 +124,7 @@ class ImapfilterWebUI < Sinatra::Application
       # immediately send all log entries with "replace" logic
       # so events which occured _while_ the page was loading
       # are displayed.
-      out << log_entries.map { |e| sse_message(:replace, e) }.join
+      out << log_entries.map { |e| sse_log_entry_message(:replace, e) }.join
 
       # purge dead connections
       @@connections.reject!(&:closed?)

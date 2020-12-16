@@ -1,7 +1,7 @@
 require "sinatra/base"
 require "thin"
 require "base64"
-require_relative "lib/imapfilter"
+require_relative "lib/subprocess"
 
 class ImapfilterWebUI < Sinatra::Application
   @@imapfilter = nil
@@ -94,7 +94,7 @@ class ImapfilterWebUI < Sinatra::Application
   post "/start" do
     @@imapfilter_mutex.synchronize do
       return if @@imapfilter&.alive?
-      @@imapfilter = Imapfilter.new
+      @@imapfilter = Subprocess.new "imapfilter -c #{File.join(__dir__, "imapfilter-config.lua")} -v", substitute_input_logs: true
       @@imapfilter.on_update { |action, entry| broadcast_sse_log_entry(action, entry) }
       @@imapfilter.start
     end

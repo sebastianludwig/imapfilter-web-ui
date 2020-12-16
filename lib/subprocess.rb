@@ -2,8 +2,11 @@ require "thread"
 require "open3"
 require_relative "log"
 
-class Imapfilter
-  def initialize
+class Subprocess
+  def initialize(command, substitute_input_logs: false)
+    @command = command
+    @substitute_input_logs = substitute_input_logs
+
     @out = Log.new :out
     @err = Log.new :err
 
@@ -66,9 +69,7 @@ class Imapfilter
 
       # inspired by http://coldattic.info/post/63/ 
       # and https://gist.github.com/chrisn/7450808
-      command = "imapfilter -c #{File.join(__dir__, "..", "imapfilter-config.lua")} -v"
-      # command = "ping 192.168.178.1"
-      Open3.popen3(command) do |stdin, stdout, stderr, wait_thr|
+      Open3.popen3(@command) do |stdin, stdout, stderr, wait_thr|
         @pid_mutex.synchronize do
           @pid = wait_thr.pid
           @pid_signal.broadcast
@@ -117,7 +118,8 @@ class Imapfilter
               local_input_buffer.slice! 0...written_bytes
 
               # Add obfuscated input to output
-              @out << chunk.gsub(/[^\n]+/, "<input>")
+              chunk = chunk.gsub(/[^\n]+/, "<input>") if @substitute_input_logs
+              @out << chunk
 
               # Remove input buffer from queue if it has been written completely
               if local_input_buffer.empty?

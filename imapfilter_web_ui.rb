@@ -51,11 +51,11 @@ class ImapfilterWebUI < Sinatra::Application
     @@connections.each { |out| out << sse_message(action, entry) }
   end
 
-  def show_page(login_redirect: true)
+  def show_main_page
     @running = @@imapfilter&.running?
     @log = log_entries
 
-    if login_redirect and @running and @log.any? { |e| needs_login? e }
+    if @running and @log.any? { |e| needs_login? e }
       redirect "/login"
     else
       erb :index
@@ -63,7 +63,7 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   get "/" do
-    show_page
+    show_main_page
   end
 
   get "/login" do
@@ -78,7 +78,7 @@ class ImapfilterWebUI < Sinatra::Application
 
   post "/login" do
     @@imapfilter << "#{params[:password]}\n" if @@imapfilter
-    show_page login_redirect: false
+    show_main_page
   end
 
   post "/start" do
@@ -88,7 +88,7 @@ class ImapfilterWebUI < Sinatra::Application
       @@imapfilter.on_log_update { |action, entry| broadcast_sse_log_entry(action, entry) }
       @@imapfilter.start
     end
-    show_page
+    show_main_page
   end
 
   post "/stop" do
@@ -97,12 +97,12 @@ class ImapfilterWebUI < Sinatra::Application
       @@imapfilter.stop
     end
     @@connections.each { |out| out.close }
-    show_page
+    show_main_page
   end
 
   post "/input" do
     @@imapfilter << "#{params[:input]}\n"
-    show_page
+    show_main_page
   end
 
   get "/log" do

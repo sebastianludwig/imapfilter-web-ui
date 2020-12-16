@@ -14,8 +14,8 @@ class Imapfilter
     @pid_mutex = Mutex.new
     @pid_signal = ConditionVariable.new
 
-    @input_buffer = ""
-    @input_buffer_mutex = Mutex.new
+    @input_buffer_queue = []
+    @input_buffer_queue_mutex = Mutex.new
 
     @log_update_handlers = []
     @log_update_handlers_mutex = Mutex.new
@@ -46,8 +46,14 @@ class Imapfilter
     merged
   end
 
+  # Blocks until the given text is passed to the imapfilter process
   def write(text)
-    @input_buffer_mutex.synchronize { @input_buffer << text }
+    @input_buffer_queue_mutex.synchronize do
+      signal = ConditionVariable.new
+      @input_buffer_queue << { text: text, signal: signal }
+      # wait for this input to be processed
+      signal.wait(@input_buffer_queue_mutex)
+    end
   end
 
   def <<(text)
@@ -65,6 +71,7 @@ class Imapfilter
       # inspired by http://coldattic.info/post/63/ 
       # and https://gist.github.com/chrisn/7450808
       command = "imapfilter -c #{File.join(__dir__, "..", "imapfilter-config.lua")} -v"
+      # command = "ping 192.168.178.1"
       Open3.popen3(command) do |stdin, stdout, stderr, wait_thr|
         @pid_mutex.synchronize do
           @pid = wait_thr.pid
@@ -80,10 +87,11 @@ class Imapfilter
 
         # loop until all output streams are closed
         until stream_to_log.empty? do
-          # transfer input buffer to a thread-local input buffer
-          @input_buffer_mutex.synchronize do
-            local_input_buffer << @input_buffer
-            @input_buffer = ""
+          if local_input_buffer.empty?
+            # transfer new input to a thread-local input buffer
+            @input_buffer_queue_mutex.synchronize do
+              local_input_buffer << @input_buffer_queue.first[:text] if not @input_buffer_queue.empty?
+            end
           end
           # only wait for stdin to be ready if we have something to write
           input_streams = local_input_buffer.empty? ? nil : [stdin]
@@ -112,7 +120,16 @@ class Imapfilter
               local_input_buffer.slice! 0...written_bytes
 
               # Add obfuscated input to output
-              @out << chunk.gsub(/.+?\n/, "<input>\n")
+              @out << chunk.gsub(/[^\n]+/, "<input>")
+
+              # Remove input buffer from queue if it has been written completely
+              if local_input_buffer.empty?
+                @input_buffer_queue_mutex.synchronize do
+                  input_buffer = @input_buffer_queue.shift
+                  # Continue the thread waiting for this input to be processed
+                  input_buffer[:signal].signal
+                end
+              end
             rescue IO::WaitWritable
               # we'll just try again if writing failed
             end

@@ -1,0 +1,20 @@
+<body class="config">
+  <form class="" action="config" method="post">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="/">Imapfilter</a>
+
+        <a class="btn btn-secondary" href="/">Back</a>
+        <div class="flex-grow-1"><!-- spacer --></div>
+        <button class="btn btn-primary" type="submit">Save</button>
+
+      </div>
+    </nav>
+
+    <main class="container-fluid p-3">
+      <textarea name="config" class="form-control font-monospace lh-1"><%= @config %></textarea>
+    </main>
+  </form>
+
+  <script src="/js/bootstrap.bundle.min.js"></script>
+</body>

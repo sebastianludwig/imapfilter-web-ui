@@ -3,6 +3,8 @@ require "thin"
 require "base64"
 require_relative "lib/subprocess"
 
+CONFIG_FILE = File.join(__dir__, "imapfilter-config.lua")
+
 class ImapfilterWebUI < Sinatra::Application
   @@imapfilter = nil
   @@imapfilter_mutex = Mutex.new
@@ -94,7 +96,7 @@ class ImapfilterWebUI < Sinatra::Application
   post "/start" do
     @@imapfilter_mutex.synchronize do
       return if @@imapfilter&.alive?
-      @@imapfilter = Subprocess.new "imapfilter -c #{File.join(__dir__, "imapfilter-config.lua")} -v", substitute_input_logs: true
+      @@imapfilter = Subprocess.new "imapfilter -c #{CONFIG_FILE} -v", substitute_input_logs: true
       @@imapfilter.on_update { |action, entry| broadcast_sse_log_entry(action, entry) }
       @@imapfilter.start
     end
@@ -129,6 +131,16 @@ class ImapfilterWebUI < Sinatra::Application
       # purge dead connections
       @@connections.reject!(&:closed?)
     end
+  end
+
+  get "/config" do
+    @config = IO.read CONFIG_FILE
+    erb :config
+  end
+
+  post "/config" do
+    IO.write CONFIG_FILE, params[:config]
+    show_main_page
   end
 end
 

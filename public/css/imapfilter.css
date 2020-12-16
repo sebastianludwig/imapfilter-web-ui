@@ -1,13 +1,33 @@
-body {
+html {
+  height: 100%;
+}
+
+/* main */
+body.main {
   padding-top: 3.5rem;
   padding-bottom: 2.5rem;
 }
-
+li.nav-item button {
+  border: 0px;
+}
 td.time {
   width: 3em;
 }
 
+/* config */
+body.config,
+body.config form,
+body.config main,
+body.config textarea
+{
+  height: 100%;
+}
 
+body.config {
+  padding-top: 3.5rem;
+}
+
+/* login */
 body.login {
   display: flex;
   align-items: center;

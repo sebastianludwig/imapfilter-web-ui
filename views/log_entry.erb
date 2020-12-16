@@ -1,0 +1,11 @@
+<tr id="<%= entry[:id] %>" class="<%= entry[:tag] == :err ? 'table-danger' : '' %>">
+  <td class="time ps-3 pe-2 d-none d-md-table-cell text-nowrap">
+    <%= entry[:timestamp].strftime("%d.%m. %H:%M:%S") %>
+  </td>
+  <td class="time ps-3 pe-2 d-md-none">
+    <%= entry[:timestamp].strftime(":%M:%S") %>
+  </td>
+  <td class="ps-2 pe-3">
+    <%= h entry[:text] %>
+  </td>
+</tr>

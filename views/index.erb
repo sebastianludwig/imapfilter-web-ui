@@ -1,0 +1,54 @@
+<body>
+  <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">Imapfilter</a>
+      <span class="navbar-text flex-fill"><%= @running ? "🟢" : "🔴" %></span>
+
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse" id="navbarContent">
+        <ul class="navbar-nav mb-2 mb-md-0 me-2">
+          <li class="nav-item">
+            <form class="d-flex" action="/start" method="post">
+              <button class="btn btn-link nav-link" type="submit">Start</button>
+            </form>
+          </li>
+          <li class="nav-item">
+            <form class="d-flex" action="/stop" method="post">
+              <button class="btn btn-link nav-link" type="submit">Stop</button>
+            </form>
+          </li>
+        </ul>
+        <form class="d-none d-md-flex flex-grow-1" action="/input" method="post">
+          <input class="form-control me-2" type="text" name="input" placeholder="Input">
+          <button class="btn btn-primary" type="submit">Enter</button>
+        </form>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container-fluid px-0">
+    <pre id="bottles-output"></pre>
+    <table class="table table-borderless table-sm table-hover font-monospace lh-1">
+      <tbody id="log-entries">
+        <% @log.each do |entry| %>
+          <%= erb :log_entry, locals: { entry: entry } %>
+        <% end %>
+      </tbody>
+    </table>
+  </main>
+
+  <nav class="navbar d-md-none fixed-bottom navbar-dark bg-dark">
+    <div class="container-fluid">
+      <form class="d-flex flex-grow-1">
+        <input class="form-control me-2" type="search" placeholder="Input">
+        <button class="btn btn-primary" type="submit">Enter</button>
+      </form>
+    </div>
+  </nav>
+
+  <script src="/js/bootstrap.bundle.min.js"></script>
+  <script src="/js/imapfilter.js"></script>
+</body>

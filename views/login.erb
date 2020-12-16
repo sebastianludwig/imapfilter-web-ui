@@ -1,0 +1,18 @@
+<body class="login text-center">  
+  <main class="form-login">
+    <form method="POST" action="login">
+      <h1 class="h3 mb-3 fw-normal">Please log in</h1>
+
+      <label for="account" class="visually-hidden">Account</label>
+      <input id="account" name="account" class="form-control" type="text" placeholder="Account" required value="<%= @account %>">
+
+      <label for="password" class="visually-hidden">Password</label>
+      <input id="password" name="password" class="form-control" type="password" placeholder="Password" required autofocus>
+      
+      <button class="w-100 btn btn-lg btn-primary" type="submit">Log In</button>
+    </form>
+    <form method="POST" action="stop">
+      <button class="w-100 btn btn-lg btn-outline-secondary" type="submit">Abort</button>
+    </form>
+  </main>
+</body>

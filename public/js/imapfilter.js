@@ -1,3 +1,15 @@
+var scrolledToNearlyBottom = function() {
+  // https://gist.github.com/nathansmith/8939548
+  var totalHeight = document.body.offsetHeight;
+  var viewportBottom = window.scrollY + window.innerHeight;
+  return viewportBottom >= totalHeight - 20;
+};
+
+var scrollToBottom = function() {
+  var scrollingElement = document.scrollingElement || document.body;
+  scrollingElement.scrollTop = scrollingElement.scrollHeight;
+};
+
 var loginRedirectIfNecessary = function(entry) {
   if (entry.needs_login) {
     window.location.replace("login");
@@ -9,20 +21,28 @@ var extractEntry = function(event) {
 };
 
 var addLogEntry = function(event) {
+  var shouldUpdateScrollPosition = scrolledToNearlyBottom();
   var entry = extractEntry(event);
 
   var tbody = document.getElementById("log-entries");
   tbody.insertAdjacentHTML("beforeend", entry.html);
 
   loginRedirectIfNecessary(entry);
+  if (shouldUpdateScrollPosition) {
+    scrollToBottom();
+  }
 };
 
 var replaceLogEntry = function(event) {
+  var shouldUpdateScrollPosition = scrolledToNearlyBottom();
   var entry = extractEntry(event);
 
   var tr = document.getElementById(event.lastEventId);
   if (tr) {
     tr.outerHTML = entry.html;
+    if (shouldUpdateScrollPosition) {
+      scrollToBottom();
+    }
   } else {
     // if there's nothing to replace add instead
     addLogEntry(event);
@@ -42,6 +62,7 @@ var onDocumentReady = function() {
   src.addEventListener("add", addLogEntry);
   src.addEventListener("replace", replaceLogEntry);
   src.addEventListener("exit", onProcessExit);
+  scrollToBottom();
 };
 
 if (document.readyState !== "loading") {

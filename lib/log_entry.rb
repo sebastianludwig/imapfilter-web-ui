@@ -41,7 +41,7 @@ class LogEntry
       tag: tag,
       timestamp: timestamp,
       complete: is_complete?,
-      text: text
+      text: text.force_encoding("utf-8")
     }
   end
 

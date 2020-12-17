@@ -21,6 +21,22 @@ class ImapfilterWebUI < Sinatra::Application
     end
   end
 
+  def start_imapfilter
+    @@imapfilter_mutex.synchronize do
+      return if @@imapfilter&.alive?
+      @@imapfilter = Subprocess.new "imapfilter -c #{CONFIG_FILE} -v", substitute_input_logs: true
+      @@imapfilter.on_update { |action, entry| broadcast_sse_log_entry(action, entry) }
+      @@imapfilter.start
+    end
+  end
+
+  def stop_imapfilter
+    @@imapfilter_mutex.synchronize do
+      return if @@imapfilter.nil?
+      @@imapfilter.stop
+    end
+  end
+
   def log_entries
     @@imapfilter&.log&.to_hash_array || []
   end
@@ -91,20 +107,12 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   post "/start" do
-    @@imapfilter_mutex.synchronize do
-      return if @@imapfilter&.alive?
-      @@imapfilter = Subprocess.new "imapfilter -c #{CONFIG_FILE} -v", substitute_input_logs: true
-      @@imapfilter.on_update { |action, entry| broadcast_sse_log_entry(action, entry) }
-      @@imapfilter.start
-    end
+    start_imapfilter
     show_main_page
   end
 
   post "/stop" do
-    @@imapfilter_mutex.synchronize do
-      return if @@imapfilter.nil?
-      @@imapfilter.stop
-    end
+    stop_imapfilter
     @@connections.each { |out| out.close }
     show_main_page
   end
@@ -137,6 +145,8 @@ class ImapfilterWebUI < Sinatra::Application
 
   post "/config" do
     IO.write CONFIG_FILE, params[:config]
+    stop_imapfilter
+    start_imapfilter
     show_main_page
   end
 end

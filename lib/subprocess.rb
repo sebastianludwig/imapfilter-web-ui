@@ -172,4 +172,11 @@ class Subprocess
       @pid_signal.wait(@pid_mutex) unless @pid.nil?
     end
   end
+
+  def signal(signal)
+    @pid_mutex.synchronize do
+      return if @pid.nil?
+      Process.kill(signal, @pid)
+    end
+  end
 end

@@ -149,6 +149,12 @@ class ImapfilterWebUI < Sinatra::Application
     start_imapfilter
     show_main_page
   end
+
+  post "/refresh" do
+    # SIGUSR1 kicks imapfilter out of `enter_idle()`, forcing an instant run
+    @@imapfilter.signal "SIGUSR1"
+    show_main_page
+  end
 end
 
 ImapfilterWebUI.run!

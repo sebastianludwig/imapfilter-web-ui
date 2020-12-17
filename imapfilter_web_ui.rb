@@ -13,6 +13,8 @@ class ImapfilterWebUI < Sinatra::Application
   configure do
     set :app_file, __FILE__
     set :server, :thin
+
+    set :bind, "0.0.0.0"
   end
 
   helpers do

@@ -110,6 +110,24 @@ class ImapfilterWebUI < Sinatra::Application
     end
   end
 
+  def commit_config
+    return if not config.dig("config-repo", "url")
+    branch = config.dig("config-repo", "branch") || "master"
+    # This isn't really thread safe (at all), but it's good enough for now
+    Dir.chdir __dir__ do
+      `git clone #{config["config-repo"]["url"]} config-repo` if not Dir.exist? "config-repo"
+      Dir.chdir "config-repo" do
+        `git checkout -B #{branch}`
+        `git reset --hard`
+        `git pull`
+        `cp #{imapfilter_config_path} ./`
+        `git add #{File.basename(imapfilter_config_path)}`
+        `git commit -m "Updated config"`
+        `git push -u origin #{branch}`
+      end
+    end
+  end
+
   get "/" do
     show_main_page
   end
@@ -170,6 +188,7 @@ class ImapfilterWebUI < Sinatra::Application
     IO.write imapfilter_config_path, params[:config]
     stop_imapfilter
     start_imapfilter
+    commit_config
     show_main_page
   end
 

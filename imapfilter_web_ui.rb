@@ -1,20 +1,39 @@
 require "sinatra/base"
 require "thin"
-require "base64"
+require "yaml"
 require_relative "lib/subprocess"
 
-CONFIG_FILE = File.join(__dir__, "imapfilter-config.lua")
 
 class ImapfilterWebUI < Sinatra::Application
   @@imapfilter = nil
   @@imapfilter_mutex = Mutex.new
   @@connections = []
 
+  def self.config
+    config_path = File.join(__dir__, "config.yaml")
+    if File.exist? config_path
+      content = YAML.load IO.read(config_path)
+    else
+      content = {}
+    end
+
+    content["imapfilter"] ||= {}
+    content["imapfilter"]["config"] ||= "imapfilter-config.lua"
+    content
+  end
+  def config
+    self.class.config
+  end
+  def imapfilter_config_path
+    config["imapfilter"]["config"].start_with?("/") ? config["imapfilter"]["config"] : File.expand_path(File.join(__dir__, config["imapfilter"]["config"]))
+  end
+
   configure do
     set :app_file, __FILE__
     set :server, :thin
 
-    set :bind, "0.0.0.0"
+    set :bind, config["web-ui"]["interface"] if config.dig("web-ui", "interface")
+    set :port, config["web-ui"]["port"] if config.dig("web-ui", "port")
   end
 
   helpers do
@@ -26,7 +45,9 @@ class ImapfilterWebUI < Sinatra::Application
   def start_imapfilter
     @@imapfilter_mutex.synchronize do
       return if @@imapfilter&.alive?
-      @@imapfilter = Subprocess.new "imapfilter -c #{CONFIG_FILE} -v", substitute_input_logs: true
+      command = "imapfilter -c #{imapfilter_config_path}"
+      command += " -v" if config.dig("imapfilter", "verbose")
+      @@imapfilter = Subprocess.new command, substitute_input_logs: true
       @@imapfilter.on_update { |action, entry| broadcast_sse_log_entry(action, entry) }
       @@imapfilter.start
     end
@@ -141,12 +162,12 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   get "/config" do
-    @config = IO.read CONFIG_FILE
+    @config = IO.read imapfilter_config_path
     erb :config
   end
 
   post "/config" do
-    IO.write CONFIG_FILE, params[:config]
+    IO.write imapfilter_config_path, params[:config]
     stop_imapfilter
     start_imapfilter
     show_main_page

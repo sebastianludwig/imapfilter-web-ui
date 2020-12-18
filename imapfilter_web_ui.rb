@@ -42,6 +42,14 @@ class ImapfilterWebUI < Sinatra::Application
     end
   end
 
+  if config.dig("web-ui", "basic-auth")
+    use Rack::Auth::Basic do |username, password|
+      expected_username = config["web-ui"]["basic-auth"]["username"]
+      expected_password = config["web-ui"]["basic-auth"]["password"]
+      !expected_username.empty? && !expected_password.empty? && username == expected_username && password == expected_password
+    end
+  end
+
   def start_imapfilter
     @@imapfilter_mutex.synchronize do
       return if @@imapfilter&.alive?

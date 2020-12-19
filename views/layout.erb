@@ -8,7 +8,7 @@
     <title>imapfilter</title>
 
     <link href="/css/bootstrap.min.css" rel="stylesheet">
-    <link href="/css/imapfilter.css?cache<%= rand(1000) %>" rel="stylesheet">
+    <link href="/css/imapfilter.css<%= development? ? "?cache=#{rand(1000)}" : "" %>" rel="stylesheet">
   </head>
   
   <%= yield %>

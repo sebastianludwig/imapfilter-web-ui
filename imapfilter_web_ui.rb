@@ -43,6 +43,10 @@ class ImapfilterWebUI < Sinatra::Application
     def h(text)
       Rack::Utils.escape_html(text)
     end
+
+    def development?
+      settings.development?
+    end
   end
 
   if config.dig("web-ui", "basic-auth")

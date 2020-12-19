@@ -58,5 +58,5 @@
   </nav>
 
   <script src="/js/bootstrap.bundle.min.js"></script>
-  <script src="/js/imapfilter.js?cache<%= rand(1000) %>"></script>
+  <script src="/js/imapfilter.js<%= development? ? "?cache=#{rand(1000)}" : "" %>"></script>
 </body>

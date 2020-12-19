@@ -15,9 +15,14 @@ And it allows you to modify the configuration.
 
 # Installation
 
-- Requires Ruby >= 2.7 (other versions probably work as well, but that's what I used)
-- `bundle install`
-- `./imapfilter_web_ui.rb`
+Requirements:
+- Ruby >= 2.7 (other versions probably work as well, but that's what I used)
+- [`imapfilter`](https://github.com/lefcha/imapfilter)
+
+```bash
+bundle install
+./imapfilter_web_ui.rb
+```
 
 ## Run as a Service
 

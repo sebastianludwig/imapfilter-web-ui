@@ -1,8 +1,11 @@
+#!/usr/bin/env ruby
+
+ENV["APP_ENV"] ||= "production"
+
 require "sinatra/base"
 require "thin"
 require "yaml"
 require_relative "lib/subprocess"
-
 
 class ImapfilterWebUI < Sinatra::Application
   @@imapfilter = nil
@@ -120,7 +123,7 @@ class ImapfilterWebUI < Sinatra::Application
 
   def commit_config
     return if not config.dig("config-repo", "url")
-    branch = config.dig("config-repo", "branch") || "master"
+    branch = config.dig("config-repo", "branch") || "main"
     # This isn't really thread safe (at all), but it's good enough for now
     Dir.chdir __dir__ do
       `git clone #{config["config-repo"]["url"]} config-repo` if not Dir.exist? "config-repo"

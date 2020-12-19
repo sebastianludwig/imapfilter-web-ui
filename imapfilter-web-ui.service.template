@@ -1,0 +1,14 @@
+[Unit]
+Description=imapfilter Web UI
+After=network.target
+
+[Service]
+ExecStart=imapfilter_web_ui.rb
+WorkingDirectory=/path/to/imapfilter-web-ui
+StandardOutput=file:/path/to/imapfilter-web-ui/log
+StandardError=file:/path/to/imapfilter-web-ui/log
+Restart=always
+User=pi
+
+[Install]
+WantedBy=multi-user.target

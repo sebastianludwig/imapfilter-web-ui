@@ -1,3 +1,5 @@
 imapfilter-config.lua
 config.yaml
 config-repo/
+log
+imapfilter-web-ui.service

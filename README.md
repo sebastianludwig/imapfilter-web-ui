@@ -4,14 +4,14 @@
 
 # Motivation
 
-I really like [`imapfilter`](https://github.com/lefcha/imapfilter) and wanted to run it on my Raspberry Pi but there were two things holding me:
+I really like [`imapfilter`](https://github.com/lefcha/imapfilter) and wanted to run it on my Raspberry Pi, but there were two things holding me back:
 
-1. Having to write the mail account passwords into the plaintext configuration files or having to log in via SSH to enter them.
+1. Having to put the mail account passwords into the plaintext configuration files or having to log in via SSH to enter them.
 1. Having to log in via SSH to tweak the configuration and add new rules.
 
-So I created a simple web UI as frontend for [`imapfilter`](https://github.com/lefcha/imapfilter).
-It prompts you for the mail acocunt passwords in the browser allowing you to use your password manager.
-And it allows you to modify the configuration.
+So I've created a simple web UI as frontend for [`imapfilter`](https://github.com/lefcha/imapfilter).
+It prompts you for the mail account passwords in the browser, allowing you to use your password manager.
+And it lets you modify the configuration.
 
 # Installation
 
@@ -31,7 +31,7 @@ Modify `imapfilter-web-ui.service.template`, copy it into `/etc/systemd/system` 
 
 ```bash
 sudo cp imapfilter-web-ui.service /etc/systemd/system/
-sudo systemctl start imapfilter-web-ui.service          # test taht it starts correctly
+sudo systemctl start imapfilter-web-ui.service          # test that it starts correctly
 sudo systemctl enable imapfilter-web-ui.service         # enable the service so it's started automatically
 ```
 
@@ -39,12 +39,12 @@ sudo systemctl enable imapfilter-web-ui.service         # enable the service so 
 
 ## Web UI
 
-You can place an `config.ymal` file into the project folder to adjust the behaviour:
+You can place a `config.yaml` file into the project folder to adjust the behaviour:
 
 ```yaml
 imapfilter:
   # Path to the imapfilter LUA configuration file. 
-  # Can eithe be relative to this file or absolute. 
+  # Can either be relative to this file or absolute. 
   # Default is `imapfilter-config.lua`.
   # Requires a restart of imapfilter.
   config: imapfilter-config.lua

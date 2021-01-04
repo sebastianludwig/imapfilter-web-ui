@@ -34,11 +34,18 @@ var addLogEntry = function(event) {
 };
 
 var replaceLogEntry = function(event) {
-  var shouldUpdateScrollPosition = scrolledToNearlyBottom();
+  var tr = document.getElementById(event.lastEventId);
+  
   var entry = extractEntry(event);
 
-  var tr = document.getElementById(event.lastEventId);
   if (tr) {
+    // If the log entry was already marked as complete, there's nothing to do.
+    if (tr.dataset.complete == "true") {
+      return;
+    }
+
+    var shouldUpdateScrollPosition = scrolledToNearlyBottom();
+
     tr.outerHTML = entry.html;
     if (shouldUpdateScrollPosition) {
       scrollToBottom();

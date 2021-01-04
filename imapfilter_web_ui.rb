@@ -184,10 +184,12 @@ class ImapfilterWebUI < Sinatra::Application
     stream(:keep_open) do |out|
       @@connections << out
 
-      # immediately send all log entries with "replace" logic
-      # so events which occured _while_ the page was loading
+      # immediately send the last 200 log entries with "replace" 
+      # logic so events which occured _while_ the page was loading
       # are displayed.
-      out << log_entries.map { |e| sse_log_entry_message(:replace, e) }.join
+      # This _still_ has the chance of missing log entries, but
+      # it's better than processing thousands of events in JS.
+      out << log_entries.last(200).map { |e| sse_log_entry_message(:replace, e) }.join
 
       # purge dead connections
       @@connections.reject!(&:closed?)

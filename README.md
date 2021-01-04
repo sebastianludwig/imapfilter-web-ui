@@ -85,6 +85,7 @@ config-repo:
 ## imapfilter
 
 `imapfilter` should be configured to use [`enter_idle()`](https://github.com/lefcha/imapfilter/blob/master/samples/extend.lua) to keep the process running.
+You can use [imapfilter-config.lua.example](imapfilter-config.lua.example) as a starting point.
 
 ## Configuration Repository
 

@@ -1,0 +1,124 @@
+---------------
+--  Options  --
+---------------
+
+options.timeout = 120
+-- Don't re-enter idle mode after the connection has been recovered. 
+-- Instead execute the next line, effectively process mails which arrived in the meantime.
+options.reenter = false
+-- Ext idle mode on any event, even just changing flags of a message
+-- to trigger reprocessing.
+options.wakeonany = true
+-- Activate if the session is terminated while idling https://github.com/lefcha/imapfilter/issues/104
+-- options.keepalive = x
+
+---------------
+--  Helpers  --
+---------------
+
+-- helpers for debugging and the interactive mode (-i)
+
+-- inspect a value
+function i(wat)
+  local inspect = require 'inspect'
+  print(inspect(wat))
+end
+
+-- inspect a set of messages
+function m(messages)
+  for _, mesg in ipairs(messages) do
+    mbox, uid = unpack(mesg)
+    message = mbox[uid]
+    i(uid .. ":" .. message:fetch_field("From") .. " - " .. message:fetch_field("Subject"))
+  end
+end
+
+----------------
+--  Accounts  --
+----------------
+
+main_account = IMAP {
+  server = "server.com",
+  username = "username",
+  ssl = "auto"
+}
+
+other_account = IMAP {
+  server = "server.com",
+  username = "username",
+  ssl = "auto"
+}
+
+inbox = main_account.INBOX
+junk_mailbox = main_account["Junk"]
+trash_mailbox = main_account["Trash"]
+archive_mailbox = main_account["Archive"]
+
+-- for debugging and to help in the interactive mode (-i)
+-- requires the `inspect` package to be installed.
+function i(wat)
+  local inspect = require 'inspect'
+  print(inspect(wat))
+end
+
+function archive(messages)
+  messages:mark_seen()
+  messages:move_messages(archive_mailbox)
+end
+
+function trash(messages)
+  messages:mark_seen()
+  messages:move_messages(trash_mailbox)
+end
+
+function junk(messages)
+  messages:mark_seen()
+  -- mark as spam so Apple Mail recognizes it as such
+  messages:remove_flags({'NotJunk', '$NotJunk'})
+  messages:add_flags({'Junk', '$Junk'})
+  messages:move_messages(junk_mailbox)
+end
+
+-- Mail processing rules go here
+--
+-- Result set operators:
+--   * intersection (AND)
+--   + union (OR)
+--   - difference (NOT)
+--
+-- Result sets can also be narrowed down further by chaining serches: https://github.com/lefcha/imapfilter/issues/220
+function process_mail()
+  -- Messages to self
+  trash(main_account["Sent Messages"]:contain_to("me@mail.com"))
+
+  --  Amazon
+  archive(inbox:contain_from("shipment-tracking@amazon.de"))
+  other_account.INBOX:contain_from("marketplace-messages@amazon.de"):move_messages(inbox)
+
+  ---------------
+  --  Archive  --
+  ---------------
+  archive(inbox:contain_subject("Your receipt from Relay FM."))
+
+
+  -------------
+  --  Trash  --
+  -------------
+  trash(inbox:contain_from("no_reply@email.apple.com"):contain_subject("TestFlight"))
+
+  ------------
+  --  Junk  --
+  ------------
+  junk(inbox:contain_from("Designer Bags") + inbox:contain_subject("Designer Bags"))
+  junk(inbox:contain_from("Bitcoin"))
+  junk(inbox:contain_from(".cn"))
+  junk(inbox:contain_from("deals"))
+  junk(inbox:contain_from("quiz"))
+  junk(inbox:contain_field("X-KasSpamfilter", "match on"))
+end
+
+idle_supported = true
+while idle_supported do
+  process_mail()
+  idle_supported = inbox:enter_idle()
+end

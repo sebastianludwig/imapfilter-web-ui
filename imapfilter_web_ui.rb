@@ -53,7 +53,7 @@ class ImapfilterWebUI < Sinatra::Application
     use Rack::Auth::Basic do |username, password|
       expected_username = config["web-ui"]["basic-auth"]["username"]
       expected_password = config["web-ui"]["basic-auth"]["password"]
-      !expected_username.empty? && !expected_password.empty? && username == expected_username && password == expected_password
+      !expected_username&.empty? && !expected_password&.empty? && username == expected_username && password == expected_password
     end
   end
 

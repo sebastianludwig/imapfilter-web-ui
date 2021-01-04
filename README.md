@@ -1,4 +1,4 @@
-# Web UI for [`imapfilter`](https://github.com/lefcha/imapfilter)
+# Web UI for imapfilter
 
 ![main](screenshots/main.png)
 
@@ -16,11 +16,15 @@ And it lets you modify the configuration.
 # Installation
 
 Requirements:
-- Ruby >= 2.7 (other versions probably work as well, but that's what I used)
 - [`imapfilter`](https://github.com/lefcha/imapfilter)
+- Ruby >= 2.5 (other versions probably work as well, but that's what I used)
 
 ```bash
-bundle install
+sudo apt-get install imapfilter
+sudo apt-get install ruby-dev     # in case you don't have it yet
+git clone https://github.com/sebastianludwig/imapfilter-web-ui
+cd imapfilter-web-ui
+[sudo] bundle install
 ./imapfilter_web_ui.rb
 ```
 
@@ -31,7 +35,8 @@ Modify `imapfilter-web-ui.service.template`, copy it into `/etc/systemd/system` 
 
 ```bash
 sudo cp imapfilter-web-ui.service /etc/systemd/system/
-sudo systemctl start imapfilter-web-ui.service          # test that it starts correctly
+sudo systemctl start imapfilter-web-ui.service
+sudo systemctl status imapfilter-web-ui.service         # check that it started correctly
 sudo systemctl enable imapfilter-web-ui.service         # enable the service so it's started automatically
 ```
 

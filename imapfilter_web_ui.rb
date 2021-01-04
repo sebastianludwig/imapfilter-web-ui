@@ -197,7 +197,11 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   get "/config" do
-    @config = IO.read imapfilter_config_path
+    begin
+      @config = IO.read imapfilter_config_path
+    rescue Errno::ENOENT
+      @config = ""
+    end
     erb :config
   end
 

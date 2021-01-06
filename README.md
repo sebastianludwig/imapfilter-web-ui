@@ -57,6 +57,11 @@ imapfilter:
   # Default is `false`.
   # Requires a restart of imapfilter.
   verbose: true
+  # Restarts imapfilter in case the process terminates, for example due to a dropped connection.
+  # To enable this the login credentials need to be cached in process memory.
+  # This cache is reset when manually stopping imapfilter or when updating the configuration.
+  # Default is `false`.
+  auto-restart: true
 web-ui:
   # The interface to bind to. 
   # `0.0.0.0` binds to all available interfaces.

@@ -3,12 +3,82 @@ require "open3"
 require_relative "log"
 
 class Subprocess
+  # Helper to decouple the update handling from the processing loop.
+  # Otherwise update handlers reacting to log output would
+  # not be able to call `subprocess.write` because `write` blocks
+  # until the input is processed. But the processing loop would be
+  # waiting until the update handler has processed the log output.
+  # This would be a deadlock.
+  class OnUpdateForwarder
+    def initialize(callback)
+      @callback = callback
+      @updates = []
+      @updates_mutex = Mutex.new
+      @updates_signal = ConditionVariable.new
+
+      @should_run_mutex = Mutex.new
+
+      start
+    end
+
+    def on_update(action, parameter)
+      @updates_mutex.synchronize do
+        @updates << { action: action, parameter: parameter }
+        # signal the processing thread to let it process the update(s)
+        @updates_signal.signal
+      end
+    end
+
+    def stop
+      # use `self` here to call the setter (which ensures thread safety)
+      self.should_run = false
+      @updates_mutex.synchronize do
+        @updates_signal.signal
+      end
+      # wait for all updates which had been enqueued before calling `stop` to be processed
+      @thread.join
+    end
+
+    private
+
+    def start
+      # use `self` here to call the setter (which ensures thread safety)
+      self.should_run = true
+      @thread = Thread.new do
+        while should_run? do
+          due_updates = []
+          @updates_mutex.synchronize do
+            # wait for the next updates to arrive
+            @updates_signal.wait(@updates_mutex) if @updates.empty?
+            # take all updates which accumulated
+            due_updates = @updates
+            @updates = []
+            # release the mutex -> the update handler may cause another `on_update` without causing a deadlock
+          end
+          # call the update handler with all due updates
+          due_updates.each { |u| @callback.call(u[:action], u[:parameter]) }
+        end
+      end
+    end
+
+    def should_run=(value)
+      @should_run_mutex.synchronize { @should_run = value }
+    end
+
+    def should_run?
+      @should_run_mutex.synchronize { @should_run }
+    end
+  end
+
   def initialize(command, substitute_input_logs: false)
     @command = command
     @substitute_input_logs = substitute_input_logs
 
     @out = Log.new :out
     @err = Log.new :err
+
+    @out.on_update { |action, log_entry_hash| @on_update_forwarder&.on_update(action, log_entry_hash) }
+    @err.on_update { |action, log_entry_hash| @on_update_forwarder&.on_update(action, log_entry_hash) }
 
     @alive = true
     @alive_mutex = Mutex.new
@@ -26,9 +96,7 @@ class Subprocess
   #  - `:replace, log_entry_hash` when a log entry has been replaced
   #  - `:exit, status` when the process has exited
   def on_update(&block)
-    @on_update = block
-    @out.on_update(&block)
-    @err.on_update(&block)
+    @on_update_forwarder = OnUpdateForwarder.new(block)
   end
 
   def running?
@@ -54,10 +122,7 @@ class Subprocess
       signal.wait(@input_buffer_queue_mutex)
     end
   end
-
-  def <<(text)
-    write text
-  end
+  alias_method :<<, :write
 
   def start
     raise "Not alive anymore. Can only be started once." if not alive?
@@ -137,6 +202,7 @@ class Subprocess
           # read from stdout and stderr
           readable.each do |stream|
             begin
+              # This write triggers an input and the input waits until it is processed - by this loop -> DEADLOCK
               stream_to_log[stream] << stream.read_nonblock(4096)
             rescue EOFError
               stream_to_log.delete stream
@@ -146,7 +212,8 @@ class Subprocess
 
         wait_thr.join
 
-        @on_update&.call(:exit, wait_thr.value.exitstatus)
+        @on_update_forwarder&.on_update(:exit, wait_thr.value.exitstatus)
+        @on_update_forwarder&.stop
 
         @pid_mutex.synchronize do
           @alive_mutex.synchronize { @alive = false }

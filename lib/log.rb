@@ -5,6 +5,7 @@ class Log
   attr_reader :entries, :entries_mutex
 
   public
+  attr_reader :tag
 
   def initialize(tag, entries = [])
     @tag = tag
@@ -12,6 +13,9 @@ class Log
     @entries_mutex = Mutex.new
   end
 
+  # Called with
+  # `<action>, log_entry_hash`
+  # and `<action>` can either be `:add` or `:replace`
   def on_update(&block)
     @on_update = block
   end
@@ -21,18 +25,26 @@ class Log
     lines = new_data.split /(?<=\n)/
     return if lines.empty?
 
+    # buffer the operations so @on_update can be called without holding the mutex
+    # in case the block calls << again.
+    operations = []
+
     @entries_mutex.synchronize do
       # Append to the last line if it isn't complete yet
       if @entries.last and not @entries.last.is_complete?
         @entries.last << lines.shift
-        @on_update&.call(:replace, @entries.last.to_hash)
+        operations << { action: :replace, entry: @entries.last.to_hash }
       end
 
       @entries += lines.map do |l| 
         new_entry = LogEntry.new(@tag, l)
-        @on_update&.call(:add, new_entry.to_hash)
+        operations << { action: :add, entry: new_entry.to_hash }
         new_entry
       end
+    end
+
+    operations.each do |o|
+      @on_update&.call(o[:action], o[:entry])
     end
   end
 

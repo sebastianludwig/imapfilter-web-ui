@@ -11,6 +11,7 @@ class ImapfilterWebUI < Sinatra::Application
   @@imapfilter = nil
   @@imapfilter_mutex = Mutex.new
   @@connections = []
+  @@credentials_cache = Hash.new
 
   def self.config
     config_path = File.join(__dir__, "config.yaml")
@@ -22,6 +23,7 @@ class ImapfilterWebUI < Sinatra::Application
 
     content["imapfilter"] ||= {}
     content["imapfilter"]["config"] ||= "imapfilter-config.lua"
+    content["imapfilter"]["auto-restart"] ||= false
     content
   end
   def config
@@ -29,6 +31,9 @@ class ImapfilterWebUI < Sinatra::Application
   end
   def imapfilter_config_path
     config["imapfilter"]["config"].start_with?("/") ? config["imapfilter"]["config"] : File.expand_path(File.join(__dir__, config["imapfilter"]["config"]))
+  end
+  def is_auto_restart_enabled?
+    config["imapfilter"]["auto-restart"] == true
   end
 
   configure do
@@ -63,7 +68,7 @@ class ImapfilterWebUI < Sinatra::Application
       command = "imapfilter -c #{imapfilter_config_path}"
       command += " -v" if config.dig("imapfilter", "verbose")
       @@imapfilter = Subprocess.new command, substitute_input_logs: true
-      @@imapfilter.on_update { |action, entry| broadcast_sse_log_entry(action, entry) }
+      @@imapfilter.on_update { |action, param| handle_imapfilter_update(action, param) }
       @@imapfilter.start
     end
   end
@@ -79,8 +84,29 @@ class ImapfilterWebUI < Sinatra::Application
     @@imapfilter&.log&.to_hash_array || []
   end
 
+  def extract_account(log_entry)
+    log_entry[:text].match(/Enter password for (.+?)@/)&.captures&.first
+  end
+
   def needs_login?(log_entry)
-    !log_entry[:complete] and log_entry[:text].start_with?("Enter password")
+    not log_entry[:complete] and not extract_account(log_entry).nil?
+  end
+
+  def handle_imapfilter_update(action, param)
+    if is_auto_restart_enabled? and action == :add
+      entry = param
+      if entry[:tag] == :err and entry[:text].start_with?("imapfilter: reading data through SSL;")
+        # wait a little bit and then re-start imapfilter
+        Thread.new do
+          sleep 5
+          start_imapfilter
+        end
+      elsif needs_login?(entry) and @@credentials_cache.include? extract_account(entry)
+        @@imapfilter << "#{@@credentials_cache[extract_account(entry)]}\n" if @@imapfilter
+        return
+      end
+    end
+    broadcast_sse(action, param)
   end
 
   def sse_message(id:, event:, data:)
@@ -102,14 +128,14 @@ class ImapfilterWebUI < Sinatra::Application
     sse_message(id: log_entry[:id], event: action, data: ERB::Util.url_encode(JSON.generate(data)))
   end
 
-  def broadcast_sse_log_entry(action, entry)
+  def broadcast_sse(action, param)
     @@connections.reject!(&:closed?)
     
     @@connections.each do |out|
       if action == :exit
-        out << sse_message(id: nil, event: action, data: entry)
+        out << sse_message(id: nil, event: action, data: param)
       else
-        out << sse_log_entry_message(action, entry)
+        out << sse_log_entry_message(action, param)
       end
     end
   end
@@ -150,7 +176,7 @@ class ImapfilterWebUI < Sinatra::Application
   get "/login" do
     entry = log_entries.reverse.find { |e| needs_login? e }
     if entry
-      @account = entry[:text].match(/Enter password for (.+?)@/).captures.first
+      @account = extract_account entry
       erb :login
     else
       redirect "/"
@@ -158,6 +184,7 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   post "/login" do
+    @@credentials_cache[params[:account]] = params[:password] if is_auto_restart_enabled?
     @@imapfilter << "#{params[:password]}\n" if @@imapfilter
     show_main_page
   end
@@ -168,6 +195,7 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   post "/stop" do
+    @@credentials_cache = Hash.new
     stop_imapfilter
     @@connections.each { |out| out.close }
     show_main_page
@@ -206,6 +234,8 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   post "/config" do
+    # Discard cached credentials to prevent malicious config edits
+    @@credentials_cache = Hash.new
     IO.write imapfilter_config_path, params[:config]
     stop_imapfilter
     start_imapfilter

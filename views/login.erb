@@ -4,7 +4,8 @@
       <h1 class="h3 mb-3 fw-normal">Please log in</h1>
 
       <label for="account" class="visually-hidden">Account</label>
-      <input id="account" name="account" class="form-control" type="text" placeholder="Account" disabled value="<%= @account %>">
+      <input id="account" class="form-control" type="text" placeholder="Account" disabled value="<%= @account %>">
+      <input name="account" type="hidden" value="<%= @account %>">
 
       <label for="password" class="visually-hidden">Password</label>
       <input id="password" name="password" class="form-control" type="password" placeholder="Password" required autofocus>

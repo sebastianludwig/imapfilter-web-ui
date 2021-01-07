@@ -1,4 +1,4 @@
-<tr id="<%= entry[:id] %>" class="<%= entry[:tag] == :err ? 'table-danger' : '' %>" data-complete="<%= entry[:complete] %>">
+<tr id="id-<%= entry[:id] %>" class="<%= entry[:tag] == :err ? 'table-danger' : '' %>" data-complete="<%= entry[:complete] %>">
   <td class="time ps-3 pe-2 d-none d-md-table-cell text-nowrap">
     <%= entry[:timestamp].strftime("%d.%m. %H:%M:%S") %>
   </td>

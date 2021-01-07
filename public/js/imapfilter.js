@@ -34,7 +34,7 @@ var addLogEntry = function(event) {
 };
 
 var replaceLogEntry = function(event) {
-  var tr = document.getElementById(event.lastEventId);
+  var tr = document.getElementById("id-" + event.lastEventId);
   
   var entry = extractEntry(event);
 

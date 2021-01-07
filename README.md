@@ -78,6 +78,14 @@ web-ui:
   basic-auth:
     username:
     password:
+  # Path to a log file.
+  # If a value is set all log entries will also be written to that file.
+  # New log entries are always appended. One the one hand this helps debugging
+  # issues which span multiple sessions on the other hand the file will grow
+  # indefinitely.
+  # Default is undefined.
+  # Requires a restart of the web UI.
+  log: imapfilter.log
 config-repo:
   # Git repository URL to push the configuration to.
   # Should be a private repository.

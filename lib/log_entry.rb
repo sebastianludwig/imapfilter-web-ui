@@ -10,7 +10,7 @@ class LogEntry
   def initialize(tag, text)
     @id = SecureRandom.uuid
     @tag = tag
-    @timestamp = Time.now.freeze
+    @timestamp = DateTime.now.freeze
     @text = ""
     self << text
     complete! if is_complete?

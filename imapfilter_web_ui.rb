@@ -10,6 +10,7 @@ require_relative "lib/subprocess"
 class ImapfilterWebUI < Sinatra::Application
   @@imapfilter = nil
   @@imapfilter_mutex = Mutex.new
+  @@log_file_mutex = Mutex.new
   @@connections = []
   @@credentials_cache = Hash.new
 
@@ -35,6 +36,12 @@ class ImapfilterWebUI < Sinatra::Application
   def is_auto_restart_enabled?
     config["imapfilter"]["auto-restart"] == true
   end
+  def log_path
+    @@log_path ||= begin
+      log_filename = config.dig("web-ui", "log")
+      log_filename.nil? ? nil : File.join(__dir__, log_filename)
+    end
+  end
 
   configure do
     set :app_file, __FILE__
@@ -59,6 +66,14 @@ class ImapfilterWebUI < Sinatra::Application
       expected_username = config["web-ui"]["basic-auth"]["username"]
       expected_password = config["web-ui"]["basic-auth"]["password"]
       !expected_username&.empty? && !expected_password&.empty? && username == expected_username && password == expected_password
+    end
+  end
+
+  def write_file_log_message(message)
+    return if log_path.nil? or message.nil?
+
+    @@log_file_mutex.synchronize do
+      File.write(log_path, message.strip + "\n", mode: 'a')
     end
   end
 
@@ -93,9 +108,19 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   def handle_imapfilter_update(action, param)
+    if action == :start
+      write_file_log_message "#{DateTime.now.iso8601} imapfilter-web-ui: imapfilter started. PID: #{param}"
+    elsif action == :exit
+      write_file_log_message "#{DateTime.now.iso8601} imapfilter-web-ui: imapfilter terminated. Exit status: #{param}"
+    elsif action == :add or action == :replace
+      entry = param
+      write_file_log_message "#{entry[:timestamp].iso8601} #{entry[:text].strip}\n" if entry[:complete]
+    end
+
     if is_auto_restart_enabled? and action == :add
       entry = param
       if entry[:tag] == :err and entry[:text].start_with?("imapfilter: reading data through SSL;")
+        write_file_log_message "#{DateTime.now.iso8601} imapfilter-web-ui: Process termination detected. Restarting..."
         # wait a little bit and then re-start imapfilter
         Thread.new do
           sleep 5
@@ -132,9 +157,11 @@ class ImapfilterWebUI < Sinatra::Application
     @@connections.reject!(&:closed?)
     
     @@connections.each do |out|
-      if action == :exit
+      if action == :start
         out << sse_message(id: nil, event: action, data: param)
-      else
+      elsif action == :exit
+        out << sse_message(id: nil, event: action, data: param)
+      elsif action == :add or action == :replace
         out << sse_log_entry_message(action, param)
       end
     end

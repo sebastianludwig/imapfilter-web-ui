@@ -1,4 +1,5 @@
 imapfilter-config.lua
+imapfilter.log
 config.yaml
 config-repo/
 log

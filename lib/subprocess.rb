@@ -212,14 +212,14 @@ class Subprocess
 
         wait_thr.join
 
-        @on_update_forwarder&.on_update(:exit, wait_thr.value.exitstatus)
-        @on_update_forwarder&.stop
-
         @pid_mutex.synchronize do
           @alive_mutex.synchronize { @alive = false }
           @pid = nil
           @pid_signal.broadcast
         end
+
+        @on_update_forwarder&.on_update(:exit, wait_thr.value.exitstatus)
+        @on_update_forwarder&.stop
       end
 
     end

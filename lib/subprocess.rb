@@ -114,6 +114,7 @@ class Subprocess
 
   # Blocks until the given text is passed to the imapfilter process
   def write(text)
+    return if not alive?
     @input_buffer_queue_mutex.synchronize do
       signal = ConditionVariable.new
       @input_buffer_queue << { text: text, signal: signal }

@@ -13,27 +13,33 @@ class Subprocess
     def initialize(callback)
       @callback = callback
       @updates = []
-      @updates_mutex = Mutex.new
-      @updates_signal = ConditionVariable.new
-
-      @should_run_mutex = Mutex.new
+      @should_run = false
+      # protects access to @updates _and_ @should_run
+      @mutex = Mutex.new
+      @signal = ConditionVariable.new
 
       start
     end
 
     def on_update(action, parameter)
-      @updates_mutex.synchronize do
+      @mutex.synchronize do
+        # Don't accept new input if we're not supposed to run anymore.
+        # This prevents that processing thread from running idefinitely 
+        # (and thus `stop` blocking) if new updates flood in faster than
+        # the thread can process them.
+        return if not @should_run
+
         @updates << { action: action, parameter: parameter }
         # signal the processing thread to let it process the update(s)
-        @updates_signal.signal
+        @signal.signal
       end
     end
 
     def stop
-      # use `self` here to call the setter (which ensures thread safety)
-      self.should_run = false
-      @updates_mutex.synchronize do
-        @updates_signal.signal
+      @mutex.synchronize do
+        @should_run = false
+        # Process updates one more time
+        @signal.signal
       end
       # wait for all updates which had been enqueued before calling `stop` to be processed
       @thread.join
@@ -42,31 +48,24 @@ class Subprocess
     private
 
     def start
-      # use `self` here to call the setter (which ensures thread safety)
-      self.should_run = true
+      @mutex.synchronize { @should_run = true }
+      
       @thread = Thread.new do
-        while should_run? do
+        # keep going if _either_ we're not stopped yet _or_ there are still updates to be sent out
+        while @mutex.synchronize { @should_run or not @updates.empty? } do
           due_updates = []
-          @updates_mutex.synchronize do
+          @mutex.synchronize do
             # wait for the next updates to arrive
-            @updates_signal.wait(@updates_mutex) if @updates.empty?
+            @signal.wait(@mutex) if @updates.empty?
             # take all updates which accumulated
             due_updates = @updates
             @updates = []
-            # release the mutex -> the update handler may cause another `on_update` without causing a deadlock
+            # release the mutex -> the update handler can cause another `on_update` without causing a deadlock
           end
           # call the update handler with all due updates
           due_updates.each { |u| @callback.call(u[:action], u[:parameter]) }
         end
       end
-    end
-
-    def should_run=(value)
-      @should_run_mutex.synchronize { @should_run = value }
-    end
-
-    def should_run?
-      @should_run_mutex.synchronize { @should_run }
     end
   end
 

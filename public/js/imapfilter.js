@@ -68,13 +68,36 @@ var onProcessExit = function() {
   document.getElementById("running-indicator-active").classList.add("d-none");
 };
 
+var updateRunningIndicator = function() {
+  var xhttp = new XMLHttpRequest();
+  xhttp.onreadystatechange = function() {
+    if (this.readyState === XMLHttpRequest.DONE && this.status == 200) {
+      if (this.responseText === "true") {
+        onProcessStart();
+      } else {
+        onProcessExit();
+      }
+    }
+  };
+  xhttp.open("GET", "running", true);
+  xhttp.send(); 
+};
+
 var onDocumentReady = function() {
-  // register server side event (SSE) listeners
+  // Register server side event (SSE) listeners
   var src = new EventSource("/log");
   src.addEventListener("start", onProcessStart);
   src.addEventListener("exit", onProcessExit);
   src.addEventListener("add", addLogEntry);
   src.addEventListener("replace", replaceLogEntry);
+
+  // The process might have died _after_ the HTML was rendered on the server
+  // and _before_ the SSE listener is connected. In this case the running
+  // indicator would be wrong. The `start` and `exit` events are also not
+  // part of the log so later requests to `/log` (see above) won't fix it.
+  updateRunningIndicator();
+
+  // Start at the bottom, that's where the interesting, already statically rendered log entries are
   scrollToBottom();
 };
 

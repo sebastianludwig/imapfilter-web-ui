@@ -228,6 +228,10 @@ class ImapfilterWebUI < Sinatra::Application
     show_main_page
   end
 
+  get "/running" do
+    (@@imapfilter&.running? || false).to_s
+  end
+
   post "/input" do
     @@imapfilter << "#{params[:input]}\n"
     show_main_page

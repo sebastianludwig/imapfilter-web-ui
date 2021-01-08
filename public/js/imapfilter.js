@@ -58,7 +58,12 @@ var replaceLogEntry = function(event) {
   loginRedirectIfNecessary(entry);
 };
 
-var onProcessExit = function(event) {
+var onProcessStart = function() {
+  document.getElementById("running-indicator-inactive").classList.add("d-none");
+  document.getElementById("running-indicator-active").classList.remove("d-none");
+};
+
+var onProcessExit = function() {
   document.getElementById("running-indicator-inactive").classList.remove("d-none");
   document.getElementById("running-indicator-active").classList.add("d-none");
 };
@@ -66,9 +71,10 @@ var onProcessExit = function(event) {
 var onDocumentReady = function() {
   // register server side event (SSE) listeners
   var src = new EventSource("/log");
+  src.addEventListener("start", onProcessStart);
+  src.addEventListener("exit", onProcessExit);
   src.addEventListener("add", addLogEntry);
   src.addEventListener("replace", replaceLogEntry);
-  src.addEventListener("exit", onProcessExit);
   scrollToBottom();
 };
 

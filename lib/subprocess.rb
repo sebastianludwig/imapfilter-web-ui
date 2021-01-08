@@ -93,6 +93,7 @@ class Subprocess
   # Called with:
   #  - `:add, log_entry_hash` when a new log entry has been added
   #  - `:replace, log_entry_hash` when a log entry has been replaced
+  #  - `:start, pid` when the process has started
   #  - `:exit, status` when the process has exited
   def on_update(&block)
     @on_update_forwarder = OnUpdateForwarder.new(block)
@@ -139,6 +140,8 @@ class Subprocess
           @pid = wait_thr.pid
           @pid_signal.broadcast
         end
+
+        @on_update_forwarder&.on_update(:start, wait_thr.pid)
 
         stream_to_log = {
           stdout => @out,

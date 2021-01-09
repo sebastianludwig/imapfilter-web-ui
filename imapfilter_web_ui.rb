@@ -7,12 +7,21 @@ require "thin"
 require "yaml"
 require_relative "lib/subprocess"
 
+RESTART_DELAYS = [ 
+  [30] * 10,      # each 30 seconds for 5 minutes 
+  [60] * 10,      # each minute for 10 minutes
+  [5 * 60] * 12,  # each 5 minutes for an hour
+  60 * 60         # finally once every hour
+].flatten
+
 class ImapfilterWebUI < Sinatra::Application
   @@imapfilter = nil
   @@imapfilter_mutex = Mutex.new
   @@log_file_mutex = Mutex.new
   @@connections = []
   @@credentials_cache = Hash.new
+  @@restart_thread = nil
+  @@restart_counter = 0
 
   def self.config
     config_path = File.join(__dir__, "config.yaml")
@@ -34,7 +43,7 @@ class ImapfilterWebUI < Sinatra::Application
     config["imapfilter"]["config"].start_with?("/") ? config["imapfilter"]["config"] : File.expand_path(File.join(__dir__, config["imapfilter"]["config"]))
   end
   def is_auto_restart_enabled?
-    config["imapfilter"]["auto-restart"] == true
+    @@auto_restart_enabled ||= config.dig("imapfilter", "auto-restart") == true
   end
   def log_path
     @@log_path ||= begin
@@ -69,14 +78,6 @@ class ImapfilterWebUI < Sinatra::Application
     end
   end
 
-  def write_file_log_message(message)
-    return if log_path.nil? or message.nil?
-
-    @@log_file_mutex.synchronize do
-      File.write(log_path, message.strip + "\n", mode: 'a')
-    end
-  end
-
   def start_imapfilter
     @@imapfilter_mutex.synchronize do
       return if @@imapfilter&.alive?
@@ -89,9 +90,29 @@ class ImapfilterWebUI < Sinatra::Application
   end
 
   def stop_imapfilter
+    # stop any pending restarts
+    @@restart_thread&.kill
+
     @@imapfilter_mutex.synchronize do
       return if @@imapfilter.nil?
       @@imapfilter.stop
+      @@restart_counter = 0
+    end
+  end
+
+  def restart_imapfilter
+    return if @@restart_thread&.alive?
+
+    sleep_interval = RESTART_DELAYS[@@restart_counter] || RESTART_DELAYS.last
+    @@restart_counter += 1
+
+    # inect an event into the update event stream
+    handle_imapfilter_update :add, { timestamp: DateTime.now, complete: true, text: "imapfilter-web-ui: Restart attempt #{@@restart_counter} in #{sleep_interval} seconds..." }
+
+    # wait a little bit and then re-start imapfilter
+    @@restart_thread = Thread.new do
+      sleep sleep_interval
+      start_imapfilter
     end
   end
 
@@ -107,28 +128,45 @@ class ImapfilterWebUI < Sinatra::Application
     not log_entry[:complete] and not extract_account(log_entry).nil?
   end
 
-  def handle_imapfilter_update(action, param)
+  def successfully_logged_in?(log_entry)
+    log_entry[:text].include? "OK Logged in"
+  end
+
+  def write_imapfilter_update_to_file(action, param)
+    return if log_path.nil?
+
+    message = nil
     if action == :start
-      write_file_log_message "#{DateTime.now.iso8601} imapfilter-web-ui: imapfilter started. PID: #{param}"
+      message = "#{DateTime.now.iso8601} imapfilter-web-ui: imapfilter started. PID: #{param}"
     elsif action == :exit
-      write_file_log_message "#{DateTime.now.iso8601} imapfilter-web-ui: imapfilter terminated. Exit status: #{param}"
+      message = "#{DateTime.now.iso8601} imapfilter-web-ui: imapfilter terminated. Exit status: #{param}"
     elsif action == :add or action == :replace
       entry = param
-      write_file_log_message "#{entry[:timestamp].iso8601} #{entry[:text].strip}\n" if entry[:complete]
+      message = "#{entry[:timestamp].iso8601} #{entry[:text].strip}" if entry[:complete]
     end
 
-    if is_auto_restart_enabled? and action == :add
-      entry = param
-      if entry[:tag] == :err and entry[:text].start_with?("imapfilter: reading data through SSL;")
-        write_file_log_message "#{DateTime.now.iso8601} imapfilter-web-ui: Process termination detected. Restarting..."
-        # wait a little bit and then re-start imapfilter
-        Thread.new do
-          sleep 5
-          start_imapfilter
+    return if message.nil?
+
+    @@log_file_mutex.synchronize do
+      File.write(log_path, message.strip + "\n", mode: 'a')
+    end
+  end
+
+  def handle_imapfilter_update(action, param)
+    write_imapfilter_update_to_file(action, param)
+
+    if is_auto_restart_enabled?
+      if action == :exit and not @@credentials_cache.empty?
+        restart_imapfilter
+      elsif action == :add
+        entry = param
+        if needs_login?(entry) and @@credentials_cache.include? extract_account(entry)
+          @@imapfilter << "#{@@credentials_cache[extract_account(entry)]}\n" if @@imapfilter
+          # do NOT send this event to the UI, otherwise it would unnecessarily redirect to the login page
+          return
+        elsif successfully_logged_in?(entry)
+          @@restart_counter = 0
         end
-      elsif needs_login?(entry) and @@credentials_cache.include? extract_account(entry)
-        @@imapfilter << "#{@@credentials_cache[extract_account(entry)]}\n" if @@imapfilter
-        return
       end
     end
     broadcast_sse(action, param)

@@ -133,7 +133,7 @@ class Subprocess
 
     Thread.new do
 
-      # inspired by http://coldattic.info/post/63/ 
+      # inspired by http://coldattic.info/post/63/
       # and https://gist.github.com/chrisn/7450808
       Open3.popen3(@command) do |stdin, stdout, stderr, wait_thr|
         @pid_mutex.synchronize do

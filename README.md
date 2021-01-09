@@ -61,6 +61,7 @@ imapfilter:
   # To enable this the login credentials need to be cached in process memory.
   # This cache is reset when manually stopping imapfilter or when updating the configuration.
   # Default is `false`.
+  # Requires a restart of the web UI.
   auto-restart: true
 web-ui:
   # The interface to bind to. 

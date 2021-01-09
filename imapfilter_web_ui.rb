@@ -306,8 +306,9 @@ class ImapfilterWebUI < Sinatra::Application
     # Discard cached credentials to prevent malicious config edits
     @@credentials_cache = Hash.new
     IO.write imapfilter_config_path, params[:config]
+    was_running = @@imapfilter&.running?
     stop_imapfilter
-    start_imapfilter
+    start_imapfilter if was_running
     commit_config
     show_main_page
   end
